@@ -3,11 +3,13 @@
 import pandas as pd
 import numpy as np
 from datetime import date
-import cx_Oracle
+import sys
 import re
 import os
 from xlsxwriter import Workbook
 import math
+
+
   def askforinteger(): 
         while True: 
             try: 
@@ -18,7 +20,7 @@ import math
                 break 
             finally: 
                         print("close this issue")                    
-import sys
+
 
 # Get current working directory 
 cwd = os.getcwd()  # Get the current working directory (cwd)
