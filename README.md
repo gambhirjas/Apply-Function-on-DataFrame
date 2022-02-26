@@ -41,7 +41,7 @@ CPU_COUNT
 !nvidia-smi
 
 
-Test Data
+# Test Data
 
 def generate_test_data(size: int, days: int = 30):
   fake = Faker()
@@ -81,8 +81,7 @@ tmp_df['priority'].loc[0]
 
 from datetime import date
  
-# calling the today
-# function of date class
+# calling today function of date class
 today = date.today()
  
 print("Today's date is", today)
@@ -92,12 +91,12 @@ Str = date.isoformat(today)
 print("String Representation", Str)
 print(type(Str))
 
-Generate Test Dataset
+# Generate Test Dataset
 
 K_MAX = 21
 
 # Generate a million rows. Use sample from it to create various size data sets
-# Will take some time as Faker will be called sequencially.
+# this will take some time as Faker will be called sequencially.
 test_data_set = generate_test_data(1 + 2 ** K_MAX, 30)
 
 test_data_set.head(5)
@@ -105,7 +104,7 @@ test_data_set.head(5)
 def test_data_sample(size: int):
   return test_data_set.sample(n=size).copy().reset_index(drop=True)
   
-#Test sample of size 10
+# Test sample of size 10
 test_data_sample(10).head(5)
 
 test_data_set.head(5)
@@ -141,10 +140,11 @@ test_data_set.info()
 
 test_data_set['priority'].loc[0]
 
-Using category for priority reduced the memory usage by ~30%.
+# Using category for priority reduced the memory usage by ~30%.
 
-Optimize DataFrame Processing Time
-The Eisenhower Method
+# Optimize DataFrame Processing Time
+
+# The Eisenhower Method
 
 Decide about action needed using Eisenhower method:
 
@@ -183,27 +183,142 @@ eisenhower_action_str(
 )
 data_sample = test_data_sample(100000)
 
+# Method 1: Loop Over All Rows of a DataFrame
+
 def loop_impl(df):
   cutoff_date = datetime.date.today() + datetime.timedelta(days=2)
-
   result = []
-  for i in range(len(df)):
+    for i in range(len(df)):
     row = df.iloc[i]
     result.append(
       eisenhower_action(row.priority == 'HIGH', row.due_date <= cutoff_date)
     )
-
   return pd.Series(result)
   
-  %timeit data_sample['action_loop'] = loop_impl(data_sample)
-  
-  def iterrows_impl(df):
+ %timeit data_sample['action_loop'] = loop_impl(data_sample)
+ %lprun -f loop_impl  loop_impl(test_data_sample(100))
+ 
+#  Method 2: Iterate over rows with iterrows Function
+ 
+ def iterrows_impl(df):
   cutoff_date = datetime.date.today() + datetime.timedelta(days=2)
   return pd.Series(
     eisenhower_action(row.priority == 'HIGH', row.due_date <= cutoff_date)
     for index, row in df.iterrows()
   )
   
+ %timeit data_sample['action_iterrow'] = iterrows_impl(data_sample)
+ 
+ 
+# Method 3: Iterate over rows with itertuples Function
+  
+def itertuples_impl(df):
+  cutoff_date = datetime.date.today() + datetime.timedelta(days=2)
+  return pd.Series(
+    eisenhower_action(row.priority == 'HIGH', row.due_date <= cutoff_date)
+    for row in df.itertuples()
+  )
+%timeit data_sample['action_itertuples'] = itertuples_impl(data_sample)
+
+# Method 4: Pandas apply Function to Every Row
+
+def apply_impl(df):
+  cutoff_date = datetime.date.today() + datetime.timedelta(days=2)
+  return df.apply(
+    lambda row: eisenhower_action(row.priority == 'HIGH', row.due_date <= cutoff_date),
+    axis=1
+  )  
+%timeit data_sample['action_impl'] = apply_impl(data_sample)
+
+# Method 5: List Comprehension
+
+def list_impl(df):
+  cutoff_date = datetime.date.today() + datetime.timedelta(days=2)
+  return pd.Series([
+    eisenhower_action(priority == 'HIGH', due_date <= cutoff_date)
+    for (priority, due_date) in zip(df['priority'], df['due_date'])
+  ])
+  
+ %timeit data_sample['action_list'] = list_impl(data_sample)
+ 
+ # Method 6: Python map Function
+ 
+ def map_impl(df):
+  cutoff_date = datetime.date.today() + datetime.timedelta(days=2)
+  return pd.Series(map(eisenhower_action, df['priority'] == 'HIGH', df['due_date'] <= cutoff_date))
+  
+  %timeit data_sample['action_map'] = map_impl(data_sample)
 
 
+# Method 7: Vectorization
 
+  def vec_impl(df):
+  cutoff_date = datetime.date.today() + datetime.timedelta(days=2)
+  return (2*(df['priority'] == 'HIGH') + (df['due_date'] <= cutoff_date))
+  
+ %timeit data_sample['action_vec'] = vec_impl(data_sample)
+ 
+# Method 8: NumPy vectorize function Ref.: From Python to NumPy
+ 
+ def np_vec_impl(df):
+  cutoff_date = datetime.date.today() + datetime.timedelta(days=2)
+  return np.vectorize(eisenhower_action)(df['priority'] == 'HIGH', df['due_date'] <= cutoff_date)
+  
+  %timeit data_sample['action_np_vec'] = np_vec_impl(data_sample)
+  
+ # Method 9: Numba Decorators Numba is commonly used to speed up applying mathmatical functions.
+  
+import numba
+
+@numba.vectorize
+def numba_eisenhower_action(is_important: bool, is_urgent: bool) -> int:
+  return 2 * is_important + is_urgent
+
+def numba_impl(df):
+  cutoff_date = datetime.date.today() + datetime.timedelta(days=2)
+  return numba_eisenhower_action(
+    (df['priority'] == 'HIGH').to_numpy(),
+    (df['due_date'] <= cutoff_date).to_numpy()
+  )
+  %timeit data_sample['action_numba'] = numba_impl(data_sample)
+  
+#  Method 10: Multiprocessing with pandarallel
+  
+from pandarallel import pandarallel
+
+pandarallel.initialize()
+
+def pandarallel_impl(df):
+  cutoff_date = datetime.date.today() + datetime.timedelta(days=2)
+  return df.parallel_apply(
+    lambda row: eisenhower_action(row.priority == 'HIGH', row.due_date <= cutoff_date),
+    axis=1
+  )
+  %timeit data_sample['action_pandarallel'] = pandarallel_impl(data_sample)
+  
+# Method 11: Parallelize with Dask Dask is a parallel computing library that supports scaling up NumPy, Pandas, Scikit-learn and many other Python libraries.
+
+import dask.dataframe as dd
+
+def dask_impl(df):
+  cutoff_date = datetime.date.today() + datetime.timedelta(days=2)
+  return dd.from_pandas(df, npartitions=CPU_COUNT).apply(
+    lambda row: eisenhower_action(row.priority == 'HIGH', row.due_date <= cutoff_date),
+    axis=1,
+    meta=(int)
+  ).compute()
+   
+  %timeit data_sample['action_dask'] = dask_impl(data_sample)
+ 
+# Method 12: Opportunistic Parallelization with Swifter Swifter automatically decides which is faster: to use dask parallel processing or a simple pandas apply.
+ 
+import swifter
+
+def swifter_impl(df):
+  cutoff_date = datetime.date.today() + datetime.timedelta(days=2)
+  return df.swifter.apply(
+    lambda row: eisenhower_action(row.priority == 'HIGH', row.due_date <= cutoff_date),
+    axis=1
+  )
+  
+  %timeit data_sample['action_swifter'] = swifter_impl(data_sample)
