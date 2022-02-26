@@ -1,5 +1,5 @@
-# Apply-Function-on-DataFrame
-Apply Function on DataFrame
+
+
 import pandas as pd
 import numpy as np
 from datetime import date
@@ -17,9 +17,9 @@ import math
                 print("there is a error of", e)     
                 break 
             finally: 
-                        print("close this issue")
-                        
+                        print("close this issue")                    
 import sys
+
 # Get current working directory 
 cwd = os.getcwd()  # Get the current working directory (cwd)
 files = os.listdir(cwd)  # Get all the files in that directory
@@ -81,7 +81,7 @@ tmp_df['priority'].loc[0]
 
 from datetime import date
  
-# calling today function of date class
+# Calling 'today' function of date class
 today = date.today()
  
 print("Today's date is", today)
