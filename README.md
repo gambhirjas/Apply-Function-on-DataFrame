@@ -96,7 +96,7 @@ print(type(Str))
 K_MAX = 21
 
 # Generate a million rows. Use sample from it to create various size data sets
-# this will take some time as Faker will be called sequencially.
+
 test_data_set = generate_test_data(1 + 2 ** K_MAX, 30)
 
 test_data_set.head(5)
